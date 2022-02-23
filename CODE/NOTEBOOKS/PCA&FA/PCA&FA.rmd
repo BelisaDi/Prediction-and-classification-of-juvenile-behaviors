@@ -1,0 +1,142 @@
+---
+title: "Proyecto Análisis Estadístico de Datos - PCA y FA"
+author: "Santiago López e Isabella Martínez"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+
+# PCA Y FA
+
+Este notebook busca realizar una reduccion de la dimensionalidad de cada uno de los datasets (musica, peliculas y hobbies) trabajados por medio de un analisis de componentes principales y un analisis de factores. 
+
+Empecemos importando las librerias necesarios
+
+```{r}
+options(warn=-1)
+
+# Para graficar
+library(ggbiplot)
+```
+
+Ahora procedamos a leer los datos y a organizarlos
+
+```{r}
+dat <- read.csv("../../DATA/responses.csv", header = TRUE, encoding = "UTF-8", sep = ",")
+
+# Convertimos los datos NaN a 0
+dat[is.na(dat)] = 0
+
+# musica
+dat_music = dat[,2:19]
+
+# peliculas
+dat_movies = dat[,21:31]
+
+# hobbies
+dat_hobbies = dat[,32:63]
+```
+
+# PCA
+
+## MUSICA
+
+Vamos a hacer componentes principales
+
+```{r}
+pca_music <- princomp(dat_music)
+summary(pca_music)
+```
+
+
+Observe que si tomamos las primeras 10 componenetes principales obtenemos una proporcion acumulada de varianza de aproximadamente el 80%, esto hace que se reduzca la dimensionalidad a mas o menos la mitad, sin embargo, no es suficiente para poder visualizar los datos.
+
+Note que los scores correspondientes a las primeras dos/tres componentes principales siguen un comportamiento sin sentido para poder concluir algo al respecto
+
+```{r}
+ggbiplot(pca_music, choices = c(1,2))
+```
+
+
+## MOVIES
+
+
+```{r}
+pca_movies <- princomp(dat_movies)
+summary(pca_movies)
+```
+
+Observe que con las primeras tres componentes principales se alcanza una proporcion acumulada de varianza de poco mas de la mitad, lo cual no es del todo malo, si se deseara una mejor (80% +) tocaria tomar en cuenta las primeras 7 componentes principales, los scores de estas se muestran a continuacion
+
+```{r}
+ggbiplot(pca_movies, choices = c(1,2))
+```
+
+## HOBBIES
+
+```{r}
+pca_hobbies <- princomp(dat_hobbies)
+summary(pca_hobbies)
+```
+
+Observe que si se quiere un 80% de varianza acumulada se necesitan al menos 18 componentes principales.
+
+```{r}
+ggbiplot(pca_hobbies, choices = c(1,2))
+
+```
+
+Podemos ver que con las primeras dos componentes principales no se alcanza a explicar ni siquiera el 30% de la varianza total de los datos.
+
+
+# FA - ANALISIS DE FACTORES
+
+Se busca hacer un analisis de factores para cada uno de los data frames mencionados a lo largo de este notebook, para esto se utilizara la funcion factanal que utiliza el metodo MLE y con una rotación varimax, este proceso se muestra a continuación
+
+## MUSICA
+
+```{r}
+(fit <- factanal(dat_music,11,rotation="varimax"))
+```
+
+Una grafica de los primeros dos factores se muestra a continuación
+
+```{r}
+load <- fit$loadings[,1:2]
+plot(load,type="n") # set up plot 
+text(load,labels=names(dat_music),cex=.7) # add variable names
+```
+
+
+## MOVIES
+
+```{r}
+(fit <- factanal(dat_movies,6,rotation="varimax"))
+```
+
+
+Una grafica de los primeros dos factores se muestra a continuación
+
+```{r}
+load <- fit$loadings[,1:2]
+plot(load,type="n") # set up plot 
+text(load,labels=names(dat_movies),cex=.7) # add variable names
+```
+
+
+## HOBBIES
+
+```{r}
+(fit <- factanal(dat_hobbies,18,rotation="varimax"))
+```
+
+Una grafica de los primeros dos factores se muestra a continuación
+
+```{r}
+load <- fit$loadings[,1:2]
+plot(load,type="n") # set up plot 
+text(load,labels=names(dat_hobbies),cex=.7) # add variable names
+```
+
+
+Un analisis mucho mas detallado de la información presentada a lo largo de este notebook se encuentra en el documento.

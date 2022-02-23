@@ -1,0 +1,94 @@
+---
+title: "Proyecto Análisis Estadístico de Datos - Analisis de Correspondencia"
+author: "Santiago López e Isabella Martínez"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+
+# ANALISIS DE CORRESPONDENCIAS
+
+El analisis de correspondencia es una técnica descriptiva aplicable al estudio de tablas de contingencia y es conceptualmente similar al análisis de componentes principales con la diferencia de que en el análisis de correspondencias los datos se escalan de modo que filas y columnas se tratan de modo equivalente. Por lo tanto, este notebook busca realizar un analisis de correspondencia a los datos trabajados a lo largo del proyecto.
+
+Empecemos importando las librerias necesarios
+
+```{r}
+options(warn=-1)
+
+# Correspondence Analysis
+library(ca)
+```
+
+Ahora procedamos a leer los datos y a organizarlos
+
+```{r}
+dat <- read.csv("../../DATA/responses.csv", header = TRUE, encoding = "UTF-8", sep = ",")
+
+# Convertimos los datos NaN a 0
+dat[is.na(dat)] = 0
+
+# musica
+dat_music = dat[,2:19]
+
+# peliculas
+dat_movies = dat[,21:31]
+
+# hobbies
+dat_hobbies = dat[,32:63]
+```
+
+Procedemos a construir diversas tablas de contingencia utilizando como primer factor el genero que cuenta con tres niveles (male, female, NaN) y variando el segundo factor, con el fin de identificar patrones entre estos. Cabe mencionar que como la proporcion de los usuarios que no respondieron al genero es tan solo del 0.6%  se decidio realizar el analisis con la totalidad de los datos.
+
+## Genero - Peliculas de romance
+
+```{r}
+mytable <- with(dat, table(Romantic,Gender)) # create a 2 way table
+prop.table(mytable, 1) # row percentages
+prop.table(mytable, 2) # column percentages
+fit <- ca(mytable)
+plot(fit) # symmetric map
+```
+
+
+## Genero - Gusto por las matematicas
+
+```{r}
+mytable <- with(dat, table(Mathematics,Gender)) # create a 2 way table
+prop.table(mytable, 1) # row percentages
+prop.table(mytable, 2) # column percentages
+fit <- ca(mytable)
+plot(fit) # symmetric map
+```
+
+## Genero - Frecuencia de consumo del alcohol
+
+```{r}
+mytable <- with(dat, table(Alcohol,Gender)) # create a 2 way table
+prop.table(mytable, 1) # row percentages
+prop.table(mytable, 2) # column percentages
+fit <- ca(mytable)
+plot(fit) # symmetric map
+```
+
+## Genero - Gusto por el baile
+
+```{r}
+mytable <- with(dat, table(Dancing,Gender)) # create a 2 way table
+prop.table(mytable, 1) # row percentages
+prop.table(mytable, 2) # column percentages
+fit <- ca(mytable)
+plot(fit) # symmetric map
+```
+
+## Genero - Miedo a las arañas
+
+```{r}
+mytable <- with(dat, table(Spiders,Gender)) # create a 2 way table
+prop.table(mytable, 1) # row percentag
+mytable <- with(dat, table(Spiders,Gender)) # create a 2 way table
+prop.table(mytable, 1) # row percentages
+prop.table(mytable, 2) # column percentages
+fit <- ca(mytable)
+plot(fit) # symmetric map
+```
+Un analisis de esta información se encuentra en el documento adjuntado con este archivo.

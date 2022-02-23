@@ -1,0 +1,406 @@
+---
+title: "Proyecto Análisis Estadístico de Datos - Clustering y clasificación"
+author: "Santiago López e Isabella Martínez"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+
+
+# CLUSTERING Y CLASIFICACIÓN
+
+Este notebook busca agrupar los usuarios basados en sus gustos de musica, peliculas y hobbies, para esto se quiere hacer clustering en cada uno de los data frames creados anteriormente, del mismo modo, queremos aplicar clasificación LDA y QDA, donde las etiquetas seran las proporcionadas por el agrupamiento realizado anteriormente, para esto se decidedividir cada uno de los data frames (music,movies,hobbies) en entrenamiento (70%), validación (20%) y prueba (10%)
+
+
+Empecemos importando las librerias necesarios
+
+```{r}
+options(warn=-1)
+
+# Para hacer clustering
+library(ClusterR)
+library(factoextra)
+
+# Para graficar 
+library(gtools)
+library(Rtsne)
+library(rgl)
+
+# Para clasificar
+library(MASS)
+```
+
+Ahora procedamos a leer los datos y a organizarlos
+
+
+
+
+```{r}
+dat <- read.csv("../../DATA/responses.csv", header = TRUE, encoding = "UTF-8", sep = ",")
+
+# Convertimos los datos NaN a 0
+dat[is.na(dat)] = 0
+
+# musica
+dat_music = dat[,2:19]
+
+# peliculas
+dat_movies = dat[,21:31]
+
+# hobbies
+dat_hobbies = dat[,32:63]
+```
+
+
+Ahora dividamos los datos en los datos que van a ser escogidos para realizar el clustering y los que no, cabe mencionar que los de prueba (los que no van a ser escogidos para el clustering) son los que se van a utilizar para realizar una pequeña simulación del modelo.
+
+
+```{r}
+set.seed(5)
+
+idx <- sample(1:nrow(dat_music), 909)
+
+dat_music_clustering <- dat_music[idx,]
+dat_movies_clustering <- dat_movies[idx,]
+dat_hobbies_clustering <- dat_hobbies[idx,]
+
+dat_music_test <- dat_music[-idx,]
+dat_movies_test <- dat_movies[-idx,]
+dat_hobbies_test <- dat_hobbies[-idx,]
+```
+
+Una vez dividos los data frames, procedemos a realizar el clustering. Cabe mencionar que previamente se intento con el metodo kmeans, sin embargo, despues de investigar un poco mas, nos dimos cuenta que el metodo kmedoids es mas robusto, por lo que se decidio trabajar con este.
+
+
+## MUSICA:
+
+Debemos encontrar un k apropiado para utilizar el metodo kmedoids, con el fin de crear los clusters, para esto se utiliza el criterio del codo, el cual se muestra a continuacion.
+
+```{r}
+n = 20
+values = rep(1,n-3)
+for (k in 3:n){
+  km.out = Cluster_Medoids(dat_music_clustering,k,distance_metric = 'euclidean')
+  values[k-2] = km.out$best_dissimilarity
+}
+
+plot(values,xlab = 'K', ylab='Funcion de costo')
+```
+
+Podemos observar en la grafica anterior, que $k=8$ es un buen candidato para kmedoids, por lo tanto, procedemos a realizar kmedoids.
+
+
+```{r}
+k = 8
+
+km_clusters <- eclust(x = dat_music_clustering, k=k,FUNcluster = "pam", seed = 1415, hc_metric = "euclidean", graph = FALSE)
+
+clusters = km_clusters$cluster
+
+dat_music_clustered <- dat_music_clustering
+dat_music_clustered$clusters = clusters
+```
+
+
+Una vez realizada la agrupación evaluemos el comportamiento del modelo con la silueta, un analisis detallado de esta se encuentra en el documento
+
+```{r}
+fviz_silhouette(sil.obj = km_clusters, print.summary = TRUE, palette = "jco",ggtheme = theme_classic()) 
+```
+
+
+Ahora bien, es de suma importancia visualizar los datos, es por esto que se decidio utilizar el metodo TSNE de reduccion de dimensionalidad (\mathbb{R}^{2}, \mathbb{R}^{3}), cabe mencionar, que este metodo es mas robusto que PCA debido a que tiene en cuenta la no linealidad de los datos.
+
+```{r}
+music_unique <- unique(dat_music_clustered)
+
+music_unique$clusters<-as.factor(music_unique$clusters)
+colors = rainbow(length(unique(music_unique$clusters)))
+names(colors) = unique(music_unique$clusters)
+
+tsne <- Rtsne(music_unique, dims = 3, perplexity=30, verbose=TRUE, max_iter = 500)
+```
+
+Visualización de los datos en $\mathbb{R}^{2}$
+
+```{r}
+plot(tsne$Y,col=colors[music_unique$clusters], xlab = 'Componente 1 de TSNE', ylab = 'Componente 2 de TSNE')
+```
+
+Visualización de los datos en $\mathbb{R}^{3}$
+
+```{r}
+## ADVERTENCIA: ESTE CODIGO GENERA LA GRAFICA EN UNA VENTANA EMERGENTE
+plot3d(tsne$Y,col=colors[music_unique$clusters],xlab = 'Componente 1 de TSNE', ylab = 'Componente 2 de TSNE', zlab = 'Componente 3 de TSNE')
+```
+
+
+Podemos observar que TSNE hace un buen trabajo de reduccion de dimensionalidad. Cabe mencionar que algunos clusters no ven del todo coherentes en la grafica, debido a que se intenta pasar de $\mathbb{R}^{18}$ a $\mathbb{R}^{2}$, por lo que las distancias entre los datos se pueden ver afectadas por variables que no se estan considerando en $\mathbb{R}^{2}$.
+
+
+## MOVIES:
+
+Similarmente a lo anterior
+
+```{r}
+n = 20
+values = rep(1,n-3)
+for (k in 3:n){
+  km.out = Cluster_Medoids(dat_movies_clustering,k,distance_metric = 'euclidean')
+  values[k-2] = km.out$best_dissimilarity
+}
+
+plot(values,xlab = 'K', ylab='Funcion de costo')
+```
+
+Podemos observar en la grafica anterior, que $k=6$ es un buen candidato para kmedoids, por lo tanto, procedemos a realizar kmedoids.
+
+
+```{r}
+k = 6
+
+km_clusters <- eclust(x = dat_movies_clustering, FUNcluster = "pam", k = k, seed = 1415, hc_metric = "euclidean", graph = FALSE)
+
+clusters = km_clusters$cluster
+
+dat_movies_clustered <- dat_movies_clustering
+dat_movies_clustered$clusters = clusters
+dat_movies_clustered = dat_movies_clustered[order(clusters),]
+```
+
+
+Una vez realizada la agrupación evaluemos el comportamiento del modelo con la silueta, un analisis detallado de esta se encuentra en el documento
+
+
+```{r}
+fviz_silhouette(sil.obj = km_clusters, print.summary = TRUE, palette = "jco",ggtheme = theme_classic()) 
+```
+
+
+Ahora visualicemos los datos
+
+```{r}
+movies_unique <- unique(dat_movies_clustered)
+
+movies_unique$clusters<-as.factor(movies_unique$clusters)
+colors = rainbow(length(unique(movies_unique$clusters)))
+names(colors) = unique(movies_unique$clusters)
+
+tsne <- Rtsne(movies_unique, dims = 3, perplexity=30, verbose=TRUE, max_iter = 500)
+```
+
+Visualizacion de los datos en $\mathbb{R}^{2}$
+
+```{r}
+plot(tsne$Y,col=colors[movies_unique$clusters], xlab = 'Componente 1 de TSNE', ylab = 'Componente 2 de TSNE')
+```
+
+Visualizacion de los datos en $\mathbb{R}^{3}$
+
+```{r}
+## ADVERTENCIA: ESTE CODIGO GENERA LA GRAFICA EN UNA VENTANA EMERGENTE
+plot3d(tsne$Y,col=colors[movies_unique$clusters],  xlab = 'Componente 1 de TSNE', ylab = 'Componente 2 de TSNE', zlab = 'Componente 3 de TSNE')
+```
+
+Podemos ver que en la grafica en $\mathbb{R}^{2}$ se pueden identificar muy bien cada uno de los clusters y en $\mathbb{R}^{3}$ se ve mejor.
+
+
+
+
+## HOBBIES
+
+
+```{r}
+n = 20
+values = rep(1,n-3)
+for (k in 3:n){
+  km.out = Cluster_Medoids(dat_hobbies_clustering,k,distance_metric = 'euclidean')
+  values[k-2] = km.out$best_dissimilarity
+}
+
+plot(values,xlab = 'K', ylab='Funcion de costo')
+```
+
+Podemos observar en la grafica anterior, que $k=8$ es un buen candidato para kmedoids, por lo tanto, procedemos a realizar kmedoids.
+
+```{r}
+k = 8
+
+km_clusters <- eclust(x = dat_hobbies_clustering, FUNcluster = "pam", k = k, seed = 1415, hc_metric = "euclidean", graph = FALSE)
+
+clusters = km_clusters$cluster
+
+dat_hobbies_clustered <- dat_hobbies_clustering
+dat_hobbies_clustered$clusters = clusters
+dat_hobbies_clustered = dat_hobbies_clustered[order(clusters),]
+```
+
+
+Una vez realizada la agrupación evaluemos el comportamiento del modelo con la silueta, un analisis detallado de esta se encuentra en el documento
+
+
+```{r}
+fviz_silhouette(sil.obj = km_clusters, print.summary = TRUE, palette = "jco",ggtheme = theme_classic()) 
+```
+
+
+Ahora visualicemos los datos
+
+```{r}
+hobbies_unique <- unique(dat_hobbies_clustered)
+
+hobbies_unique$clusters<-as.factor(hobbies_unique$clusters)
+colors = rainbow(length(unique(hobbies_unique$clusters)))
+names(colors) = unique(hobbies_unique$clusters)
+
+tsne <- Rtsne(hobbies_unique, dims = 3, perplexity=30, verbose=TRUE, max_iter = 500)
+```
+
+Visualizacion de los datos en $\mathbb{R}^{2}$
+
+```{r}
+plot(tsne$Y,col=colors[hobbies_unique$clusters],xlab = 'Componente 1 de TSNE', ylab = 'Componente 2 de TSNE')
+```
+
+
+Visualizacion de los datos en $\mathbb{R}^{3}$
+
+```{r}
+## ADVERTENCIA: ESTE CODIGO GENERA LA GRAFICA EN UNA VENTANA EMERGENTE
+plot3d(tsne$Y,col=colors[hobbies_unique$clusters],xlab = 'Componente 1 de TSNE', ylab = 'Componente 2 de TSNE', zlab = 'Componente 3 de TSNE')
+```
+
+Podemos ver que en las graficas aparce una inconstencia en los clusters formados, sin embargo, esto se puedo deber a que el el data frame de hobbies hay 32 variables y se esta haciendo una reduccion 2 y 3 variables, lo cual puede afectar la consistencia de esto, sin embargo,  $\mathbb{R}^{3}$ se puede ver mejor.
+
+
+
+# CLASIFICACIÓN
+
+Ahora bien, una vez hechos los clusters procedemos a realizar un contraste entre la clasificación mediante LDA y QDA, para esto, se van a dividir los datos en training y validation. Cabe mencionar que para esta sección se utilizaran los datos con los que si se realizaron clustering (se tienen etiquetas)
+
+Empecemos diviendo los datos de cada uno de los grupos (musica, peliculas y hobbies) en training y validacion
+
+```{r}
+idx2 <- sample(1:909,707)
+
+# musica
+train_music <- dat_music_clustered[idx2,]
+test_music <- dat_music_clustered[-idx2,]
+
+# peliculas
+train_movies <- dat_movies_clustered[idx2,]
+test_movies <- dat_movies_clustered[-idx2,]
+
+# hobbies
+train_hobbies <- dat_hobbies_clustered[idx2,]
+test_hobbies <- dat_hobbies_clustered[-idx2,]
+```
+
+
+## MUSICA
+
+Con LDA...
+
+```{r}
+lda_music <- lda(train_music[-19], train_music$clusters)
+lda.pred_music <- predict(lda_music, test_music[-19])
+conf_lda_music <- table(test_music$clusters, lda.pred_music$class); conf_lda_music
+(error_lda_music <- 1 - sum(diag(conf_lda_music))/202)
+```
+
+Con QDA...
+
+```{r}
+qda_music <- qda(train_music[-19], train_music$clusters)
+qda.pred_music<- predict(qda_music, test_music[-19])
+conf_qda_music <- table(test_music$clusters, qda.pred_music$class); conf_qda_music
+(error_qda_music <- 1 - sum(diag(conf_qda_music))/202)
+```
+
+Podemos ver que con LDA se comporta mejor la clasificacion, puesto que tiene un error de aparente (APER) menor.
+Cabe mencionar que esto depende mucho de la muestra seleccionada para training
+
+Ahora buscamos simular el proceso de clasificación con los datos de testing (usuarios totalmente nuevos que no se conoce su etiqueta)
+
+```{r}
+lda.pred_music_testing <- predict(lda_music, dat_music_test)
+( lda.pred_music_testing$class )
+```
+
+## PELICULAS
+
+
+Con LDA...
+
+```{r}
+lda_movies <- lda(train_movies[-12], train_movies$clusters)
+lda.pred_movies <- predict(lda_movies, test_movies[-12])
+conf_lda_movies <- table(test_movies$clusters, lda.pred_movies$class); conf_lda_movies
+(error_lda_movies <- 1 - sum(diag(conf_lda_movies))/202)
+```
+
+Con QDA...
+
+```{r}
+qda_movies <- qda(train_movies[-12], train_movies$clusters)
+qda.pred_movies<- predict(qda_movies, test_movies[-12])
+conf_qda_movies <- table(test_movies$clusters, qda.pred_movies$class); conf_qda_movies
+(error_qda_movies <- 1 - sum(diag(conf_qda_movies))/202)
+```
+
+Podemos ver que con LDA se comporta mejor la clasificacion, aunque no por mucho.
+
+Ahora buscamos simular el proceso de clasificación con los datos de testing (usuarios totalmente nuevos que no se conoce su etiqueta)
+
+```{r}
+lda.pred_movies_testing <- predict(lda_movies, dat_movies_test)
+( lda.pred_movies_testing$class )
+```
+
+
+## HOBBIES
+
+Con LDA...
+```{r}
+lda_hobbies <- lda(train_hobbies[-33], train_hobbies$clusters)
+lda.pred_hobbies <- predict(lda_hobbies, test_hobbies[-33])
+conf_lda_hobbies <- table(test_hobbies$clusters, lda.pred_hobbies$class); conf_lda_hobbies
+(error_lda_hobbies <- 1 - sum(diag(conf_lda_hobbies))/202)
+```
+
+Con QDA...
+
+```{r}
+qda_hobbies <- qda(train_hobbies[-33], train_hobbies$clusters)
+qda.pred_hobbies<- predict(qda_hobbies, test_hobbies[-33])
+conf_qda_hobbies <- table(test_hobbies$clusters, qda.pred_hobbies$class); conf_qda_hobbies
+(error_qda_hobbies <- 1 - sum(diag(conf_qda_hobbies))/202)
+```
+
+Podemos ver que en este caso, definitivamente LDA se comporta mejor que QDA, aunque el error aparente sigue siendo alto, esta relativamente bien.
+
+Ahora buscamos simular el proceso de clasificación con los datos de testing (usuarios totalmente nuevos que no se conoce su etiqueta)
+
+```{r}
+lda.pred_hobbies_testing <- predict(lda_hobbies, dat_hobbies_test)
+( lda.pred_hobbies_testing$class )
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
